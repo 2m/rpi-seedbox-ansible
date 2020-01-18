@@ -1,0 +1,50 @@
+# Most of the commands adapted from
+# https://andreas.scherbaum.la/blog/archives/967-Avoid-wear-out-of-SSD-cards-in-an-openHAB-system.html
+
+---
+- name: Disable logging to reduce storage card usage
+  hosts: all
+  handlers:
+    - import_tasks: handlers.yml
+  tasks:
+    - name: Update /etc/systemd/journald.conf
+      become: yes
+      lineinfile:
+        dest: /etc/systemd/journald.conf
+        regexp: '{{ item.regexp }}'
+        line: '{{ item.line }}'
+        state: '{{ item.state }}'
+        create: yes
+      with_items:
+        - { regexp: '^#? *Storage', line: 'Storage=volatile', state: present }
+        - {
+            regexp: '^#? *SystemMaxUse',
+            line: 'SystemMaxUse=50M',
+            state: present,
+          }
+        - {
+            regexp: '^#? *SystemMaxFileSize',
+            line: 'SystemMaxFileSize=25M',
+            state: present,
+          }
+      notify:
+        - restart systemd-journald
+
+    - name: Update /etc/fstab
+      become: yes
+      lineinfile:
+        dest: /etc/fstab
+        line: '{{ item.line }}'
+        state: '{{ item.state }}'
+        create: yes
+      with_items:
+        - {
+            line: 'tmpfs     /var/tmp        tmpfs   size=10M,nodev,nosuid,noatime,mode=1777     0  0',
+            state: present,
+          }
+        - {
+            line: 'tmpfs     /var/log        tmpfs   size=50M,nodev,nosuid,noatime,mode=0755     0  0',
+            state: present,
+          }
+      notify:
+        - restart system
